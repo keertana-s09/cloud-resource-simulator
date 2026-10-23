@@ -1,0 +1,23 @@
+# CPU bottleneck: RAM is plentiful, CPU is scarce.
+# Tasks wait because no VM has enough free CPU, never because of RAM.
+VM node1 4 32768
+VM node2 4 32768
+VM node3 6 32768
+#
+# TASK <id> <cpu> <ram_mb> <arrival> <duration> <priority>
+TASK 1   3  2048  0  5  2
+TASK 2   2  1024  0  4  1
+TASK 3   4  2048  1  6  3
+TASK 4   2  1024  1  3  2
+TASK 5   3  4096  2  5  1
+TASK 6   1  1024  2  2  4
+TASK 7   4  2048  3  4  2
+TASK 8   2  1024  4  6  5
+TASK 9   3  2048  4  3  1
+TASK 10  2  1024  5  5  3
+TASK 11  5  2048  6  4  2
+TASK 12  1  512   6  2  1
+TASK 13  3  2048  7  5  4
+TASK 14  2  1024  8  3  2
+TASK 15  4  4096  9  4  3
+TASK 16  2  1024  10 2  1

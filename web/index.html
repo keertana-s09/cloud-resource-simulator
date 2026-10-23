@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Resource Simulator</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --good: #0ca30c;
+  --good-text: #006300;
+  --critical: #d03b3b;
+  --warning: #fab219;
+  --accent-wash: rgba(42,120,214,0.10);
+  --input: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926; --good-text: #0ca30c;
+    --accent-wash: rgba(57,135,229,0.16); --input: #121211;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --series-1: #3987e5; --series-2: #d95926; --good-text: #0ca30c;
+  --accent-wash: rgba(57,135,229,0.16); --input: #121211;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 48px; }
+header h1 { font-size: 20px; margin: 0; }
+header p { margin: 2px 0 16px; color: var(--ink-2); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 14px; min-width: 0; }
+.card h2 { font-size: 14px; margin: 0 0 2px; }
+.card .sub { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.controls label { display: flex; flex-direction: column; font-size: 12px; color: var(--ink-2); gap: 3px; }
+select, input, textarea, button { font: inherit; color: var(--ink); }
+select, input[type=number] { background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; min-height: 32px; }
+input[type=number] { width: 74px; }
+button { border: 1px solid var(--border); background: var(--input); border-radius: 6px; padding: 6px 14px; min-height: 32px; cursor: pointer; }
+button.primary { background: var(--series-1); border-color: transparent; color: #fff; font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, tr:focus-visible, textarea:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+textarea { width: 100%; min-height: 220px; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-top: 10px; }
+.error { color: var(--critical); margin-top: 8px; white-space: pre-wrap; }
+.error:empty { display: none; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.tile .k { font-size: 12px; color: var(--ink-2); }
+.tile .v { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.tile .d { font-size: 11px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.scroll { overflow: auto; max-height: 420px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; color: var(--ink-2); font-weight: 600; border-bottom: 1px solid var(--axis); padding: 5px 8px; position: sticky; top: 0; background: var(--surface); white-space: nowrap; }
+td { border-bottom: 1px solid var(--grid); padding: 4px 8px; vertical-align: top; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr.click { cursor: pointer; }
+tbody tr.click:hover { background: var(--accent-wash); }
+tbody tr.sel { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--series-1); }
+.st { white-space: nowrap; font-weight: 600; }
+.st.COMPLETED { color: var(--good-text); }
+.st.REJECTED { color: var(--critical); }
+.st.WAITING, .st.RUNNING { color: var(--ink-2); }
+.best { font-weight: 700; }
+.best::after { content: " ★"; color: var(--series-1); font-size: 11px; }
+.ev { font-size: 12.5px; }
+.ev .row { display: grid; grid-template-columns: 52px 46px 92px 46px minmax(0,1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--grid); }
+.ev .row > span:nth-child(-n+4) { color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tag { font-weight: 600; font-size: 11px; letter-spacing: .02em; }
+.tag.ALLOCATED { color: var(--series-1); }
+.tag.COMPLETED { color: var(--good-text); }
+.tag.REJECTED, .tag.ERROR { color: var(--critical); }
+.tag.WAITING { color: var(--ink-2); }
+.tag.ARRIVED { color: var(--muted); }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; border-radius: 1px; }
+.legend i.box { height: 10px; width: 10px; border-radius: 2px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-width: 280px; z-index: 5; }
+.tip[hidden] { display: none; }
+.tip .tv { font-weight: 700; color: var(--ink); }
+.tip .tl { color: var(--ink-2); }
+.tip .key { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 6px; }
+.empty { color: var(--muted); font-size: 13px; padding: 18px 0; }
+.note { font-size: 12px; color: var(--muted); }
+.flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.autopsy .item { border-left: 2px solid var(--axis); padding: 2px 0 8px 10px; margin-left: 4px; }
+.autopsy .item .h { font-size: 12px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cloud Resource Allocation Simulator</h1>
+    <p>Local web view on 127.0.0.1, running the same C++ engine as the terminal app. Nothing leaves this computer.</p>
+  </header>
+
+  <section class="card" aria-label="Simulation settings">
+    <div class="controls">
+      <label>Workload <select id="workload"></select></label>
+      <label>Scheduling
+        <select id="sched"><option value="fcfs">FCFS</option><option value="priority">Priority</option><option value="aging">Aging Priority</option></select></label>
+      <label>Placement
+        <select id="place"><option value="first">First-Fit</option><option value="best">Best-Fit</option><option value="load">Load-Aware</option></select></label>
+      <label>Queue mode
+        <select id="queue"><option value="backfill">Backfill</option><option value="strict">Strict</option></select></label>
+      <label>Aging K <input id="aging" type="number" min="1" value="5"></label>
+      <label>Starvation &gt; <input id="starve" type="number" min="0" value="20"></label>
+      <button id="run" class="primary">Run simulation</button>
+      <button id="compare">Compare all 9 policies</button>
+    </div>
+    <details>
+      <summary>Edit workload (VM / TASK / CONFIG lines)</summary>
+      <textarea id="text" spellcheck="false" aria-label="Workload definition"></textarea>
+      <div class="note">Format: <code>VM name cpu ram_mb</code> · <code>TASK id cpu ram_mb arrival duration priority</code>. Edits are used by Run and Compare; files on disk are not changed.</div>
+    </details>
+    <div id="error" class="error" role="alert"></div>
+  </section>
+
+  <div id="tiles" class="tiles" aria-live="polite"></div>
+
+  <section class="card">
+    <h2>VM timeline</h2>
+    <p class="sub" id="ganttSub">Each bar is a task running on a VM, from start to completion. Hover for details; click to open its decision autopsy.</p>
+    <div class="legend" id="ganttLegend"></div>
+    <div class="chart" id="gantt"><div class="empty">Run a simulation to see the timeline.</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Utilization over time</h2>
+    <p class="sub">Share of total CPU and RAM reserved during each tick.</p>
+    <div class="legend"><span><i style="background:var(--series-1)"></i>CPU</span><span><i style="background:var(--series-2)"></i>RAM</span></div>
+    <div class="chart" id="util"><div class="empty">Run a simulation to see utilization.</div></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Tasks</h2>
+      <p class="sub">Click a row to see why it was allocated, kept waiting or rejected.</p>
+      <div class="scroll" id="tasks"><div class="empty">No results yet.</div></div>
+    </section>
+    <section class="card">
+      <h2 id="autopsyTitle">Decision autopsy</h2>
+      <p class="sub">Every reason is derived from simulator state at that tick.</p>
+      <div class="scroll autopsy" id="autopsy"><div class="empty">Select a task.</div></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Policy comparison</h2>
+    <p class="sub" id="cmpSub">Replays the same workload from a clean state under every scheduling × placement combination. ★ marks the best value in a column. Click a row to run that combination.</p>
+    <div class="scroll" id="cmp"><div class="empty">Press “Compare all 9 policies”.</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Event log</h2>
+    <div class="flex">
+      <label class="note">Type
+        <select id="evType"><option value="">All</option><option>ARRIVED</option><option>WAITING</option><option>ALLOCATED</option><option>COMPLETED</option><option>REJECTED</option><option>ERROR</option></select></label>
+      <label class="note">Task ID <input id="evTask" type="number" min="0" placeholder="all"></label>
+      <span class="note" id="evCount"></span>
+    </div>
+    <div class="scroll ev" id="events"><div class="empty">No events yet.</div></div>
+  </section>
+</main>
+
+<div class="tip" id="tip" hidden></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+let last = null;          // last SimulationResult JSON
+let selectedTask = null;
+
+function el(tag, attrs = {}, text) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+function svg(tag, attrs = {}) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+const pct = (v) => (v * 100).toFixed(1) + "%";
+const fmt = (v, d = 2) => Number(v).toFixed(d);
+
+function params(includePolicies) {
+  const p = new URLSearchParams({
+    queue: $("queue").value, aging: $("aging").value, starve: $("starve").value, name: $("workload").value || "custom",
+  });
+  if (includePolicies) { p.set("sched", $("sched").value); p.set("place", $("place").value); }
+  return p.toString();
+}
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function setError(msg) { $("error").textContent = msg || ""; }
+
+// ------------------------------------------------------------ workload loading
+const QMAP = { strict: "strict", hol: "strict", backfill: "backfill" };
+async function loadWorkload(name) {
+  const w = await api("/api/workload?name=" + encodeURIComponent(name));
+  $("text").value = w.text;
+  const c = w.config || {};
+  if (c.queue_mode && QMAP[c.queue_mode.toLowerCase()]) $("queue").value = QMAP[c.queue_mode.toLowerCase()];
+  else $("queue").value = "backfill";
+  $("aging").value = c.aging_interval || 5;
+  $("starve").value = c.starvation_threshold || 20;
+  $("cmp").replaceChildren(el("div", { class: "empty" }, "Press “Compare all 9 policies”."));
+}
+
+async function run() {
+  setError("");
+  $("run").disabled = true;
+  try {
+    last = await api("/api/run?" + params(true), { method: "POST", body: $("text").value });
+    selectedTask = null;
+    renderAll();
+  } catch (e) { setError(e.message); }
+  finally { $("run").disabled = false; }
+}
+
+async function compare() {
+  setError("");
+  $("compare").disabled = true;
+  try {
+    const data = await api("/api/compare?" + params(false), { method: "POST", body: $("text").value });
+    renderCompare(data.results);
+  } catch (e) { setError(e.message); }
+  finally { $("compare").disabled = false; }
+}
+
+// ------------------------------------------------------------ render
+function renderAll() {
+  renderTiles();
+  renderGantt();
+  renderUtil();
+  renderTasks();
+  renderAutopsy();
+  renderEvents();
+}
+
+function renderTiles() {
+  const m = last.metrics;
+  const tiles = [
+    ["Completed", `${m.completed} / ${m.totalTasks}`, `${m.rejected} rejected${m.unfinished ? `, ${m.unfinished} unfinished` : ""}`],
+    ["Avg waiting", fmt(m.avgWaiting), "ticks, completed tasks"],
+    ["Avg turnaround", fmt(m.avgTurnaround), "ticks, completed tasks"],
+    ["Max waiting", m.maxWaiting, "ticks"],
+    ["Throughput", fmt(m.throughput, 3), "tasks per tick"],
+    ["CPU utilization", pct(m.cpuUtilization), `over [0, ${m.endTick})`],
+    ["RAM utilization", pct(m.ramUtilization), `over [0, ${m.endTick})`],
+    ["Starved", m.starved.length, m.starved.length ? "wait > " + m.starvationThreshold + ": " + m.starved.map(i => "T" + i).join(" ") : "wait > " + m.starvationThreshold + " ticks"],
+  ];
+  const box = $("tiles");
+  box.replaceChildren();
+  for (const [k, v, d] of tiles) {
+    const t = el("div", { class: "tile" });
+    t.append(el("div", { class: "k" }, k), el("div", { class: "v" }, String(v)), el("div", { class: "d" }, d));
+    box.append(t);
+  }
+}
+
+// --- tooltip
+const tip = $("tip");
+function showTip(evt, rows) {
+  tip.replaceChildren();
+  for (const r of rows) {
+    const line = el("div");
+    if (r.color) { const k = el("span", { class: "key" }); k.style.background = r.color; line.append(k); }
+    if (r.value !== undefined) line.append(el("span", { class: "tv" }, r.value + " "));
+    if (r.label) line.append(el("span", { class: "tl" }, r.label));
+    tip.append(line);
+  }
+  tip.hidden = false;
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + w > innerWidth - 8) x = evt.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = evt.clientY - h - pad;
+  tip.style.left = (x + scrollX) + "px";
+  tip.style.top = (y + scrollY) + "px";
+}
+function hideTip() { tip.hidden = true; }
+
+function niceTicks(max, target) {
+  if (max <= 0) return [0];
+  const raw = max / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 5, 10].map(s => s * mag).find(s => max / s <= target) || mag * 10;
+  const out = [];
+  for (let v = 0; v <= max + 1e-9; v += step) out.push(Math.round(v));
+  return out;
+}
+
+function renderGantt() {
+  const host = $("gantt");
+  host.replaceChildren();
+  const tasks = last.tasks.filter(t => t.start >= 0);
+  const end = Math.max(1, last.metrics.endTick, ...tasks.map(t => t.completion >= 0 ? t.completion : last.metrics.endTick));
+  const starved = new Set(last.metrics.starved);
+
+  const legend = $("ganttLegend");
+  legend.replaceChildren();
+  const l1 = el("span"); const b1 = el("i", { class: "box" }); b1.style.background = "var(--series-1)"; l1.append(b1, document.createTextNode("Task running"));
+  const l2 = el("span"); const b2 = el("i", { class: "box" }); b2.style.background = "var(--series-2)"; l2.append(b2, document.createTextNode("Task that was starved (waited > " + last.metrics.starvationThreshold + ")"));
+  legend.append(l1);
+  if (starved.size) legend.append(l2);
+
+  // assign lanes per VM so concurrent tasks don't overlap
+  const rows = [];
+  for (const vm of last.vms) {
+    const mine = tasks.filter(t => t.vmId === vm.id).sort((a, b) => a.start - b.start || a.id - b.id);
+    const laneEnds = [];
+    for (const t of mine) {
+      const fin = t.completion >= 0 ? t.completion : end;
+      let lane = laneEnds.findIndex(e => e <= t.start);
+      if (lane < 0) { lane = laneEnds.length; laneEnds.push(0); }
+      laneEnds[lane] = fin;
+      t._lane = lane; t._end = fin;
+    }
+    rows.push({ vm, tasks: mine, lanes: Math.max(1, laneEnds.length) });
+  }
+
+  const W = Math.max(320, host.clientWidth), left = 112, right = 12, top = 6, laneH = 20, gap = 2, groupGap = 12, axisH = 22;
+  const H = top + rows.reduce((s, r) => s + r.lanes * laneH + groupGap, 0) + axisH;
+  const x = (t) => left + (t / end) * (W - left - right);
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Gantt chart of tasks per VM over time" });
+
+  const ticks = niceTicks(end, Math.max(4, Math.floor((W - left) / 70)));
+  for (const t of ticks) {
+    s.append(svg("line", { x1: x(t), x2: x(t), y1: top, y2: H - axisH, stroke: "var(--grid)", "stroke-width": 1 }));
+    const tx = svg("text", { x: x(t), y: H - 6, "text-anchor": "middle" }); tx.textContent = t; s.append(tx);
+  }
+  const axisLabel = svg("text", { x: W - right, y: H - 6, "text-anchor": "end" }); axisLabel.textContent = "tick";
+  if (ticks.length && x(ticks[ticks.length - 1]) < W - right - 40) s.append(axisLabel);
+
+  let y = top;
+  for (const r of rows) {
+    const gh = r.lanes * laneH;
+    const name = svg("text", { x: 0, y: y + Math.min(gh, laneH) / 2 + 4 }); name.style.fill = "var(--ink)";
+    name.textContent = `VM${r.vm.id} ${r.vm.name}`.slice(0, 16);
+    const cap = svg("text", { x: 0, y: y + Math.min(gh, laneH) / 2 + 17 });
+    cap.textContent = `${r.vm.cpu} CPU · ${r.vm.ram / 1024} GB`;
+    s.append(name, cap);
+    s.append(svg("line", { x1: left, x2: W - right, y1: y + gh + groupGap / 2, y2: y + gh + groupGap / 2, stroke: "var(--axis)", "stroke-width": 1 }));
+    for (const t of r.tasks) {
+      const bx = x(t.start) + 1, bw = Math.max(2, x(t._end) - x(t.start) - 2), by = y + t._lane * laneH + gap / 2, bh = laneH - gap;
+      const g = svg("g", { tabindex: 0, role: "button", "aria-label": `Task T${t.id} on VM${t.vmId}, ticks ${t.start} to ${t._end}` });
+      g.style.cursor = "pointer";
+      const fill = starved.has(t.id) ? "var(--series-2)" : "var(--series-1)";
+      const rect = svg("rect", { x: bx, y: by, width: bw, height: bh, rx: 4, fill });
+      if (selectedTask === t.id) { rect.setAttribute("stroke", "var(--ink)"); rect.setAttribute("stroke-width", 2); }
+      g.append(rect);
+      if (bw > 26) {
+        const lbl = svg("text", { x: bx + 5, y: by + bh / 2 + 4 }); lbl.style.fill = "#fff"; lbl.style.fontWeight = 600;
+        lbl.textContent = "T" + t.id; g.append(lbl);
+      }
+      const rows = () => [
+        { value: "T" + t.id, label: `on VM${t.vmId}` },
+        { value: `${t.start} → ${t._end}`, label: "ticks" },
+        { value: t.start - t.arrival, label: "ticks waited (arrived t=" + t.arrival + ")" },
+        { value: `${t.cpu} CPU / ${t.ram} MB`, label: "· priority " + t.priority },
+      ];
+      g.addEventListener("pointermove", (e) => { rect.setAttribute("opacity", .82); showTip(e, rows()); });
+      g.addEventListener("pointerleave", () => { rect.removeAttribute("opacity"); hideTip(); });
+      g.addEventListener("focus", () => { const b = g.getBoundingClientRect(); showTip({ clientX: b.right, clientY: b.bottom }, rows()); });
+      g.addEventListener("blur", hideTip);
+      g.addEventListener("click", () => selectTask(t.id));
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectTask(t.id); } });
+      s.append(g);
+    }
+    y += gh + groupGap;
+  }
+  host.append(s);
+
+  const rejected = last.tasks.filter(t => t.status === "REJECTED");
+  $("ganttSub").textContent = "Each bar is a task running on a VM, from start to completion. Hover for details; click to open its decision autopsy." +
+    (rejected.length ? ` Rejected (never ran): ${rejected.map(t => "T" + t.id).join(", ")}.` : "");
+}
+
+function renderUtil() {
+  const host = $("util");
+  host.replaceChildren();
+  const end = last.metrics.endTick;
+  if (end <= 0) { host.append(el("div", { class: "empty" }, "Nothing ran.")); return; }
+  const totalCpu = last.vms.reduce((s, v) => s + v.cpu, 0), totalRam = last.vms.reduce((s, v) => s + v.ram, 0);
+  const samples = last.utilization.filter(u => u[0] < end).map(u => ({ t: u[0], cpu: u[1] / totalCpu, ram: u[2] / totalRam, uc: u[1], ur: u[2] }));
+
+  const W = Math.max(320, host.clientWidth), H = 220, left = 40, right = 44, top = 10, bottom = 24;
+  const x = (t) => left + (t / end) * (W - left - right);
+  const y = (v) => top + (1 - v) * (H - top - bottom);
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "CPU and RAM utilization per tick" });
+
+  for (const v of [0, .25, .5, .75, 1]) {
+    s.append(svg("line", { x1: left, x2: W - right, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+    const tx = svg("text", { x: left - 6, y: y(v) + 4, "text-anchor": "end" }); tx.textContent = (v * 100) + "%"; s.append(tx);
+  }
+  for (const t of niceTicks(end, Math.max(4, Math.floor((W - left) / 70)))) {
+    const tx = svg("text", { x: x(t), y: H - 6, "text-anchor": "middle" }); tx.textContent = t; s.append(tx);
+  }
+  // step lines: a value holds for the whole tick [t, t+1)
+  const path = (key) => {
+    let d = "";
+    samples.forEach((p, i) => { d += (i ? `L${x(p.t)},${y(p[key])}` : `M${x(p.t)},${y(p[key])}`) + `L${x(p.t + 1)},${y(p[key])}`; });
+    return d;
+  };
+  const series = [["cpu", "var(--series-1)", "CPU"], ["ram", "var(--series-2)", "RAM"]];
+  for (const [k, c] of series) s.append(svg("path", { d: path(k), fill: "none", stroke: c, "stroke-width": 2, "stroke-linejoin": "round" }));
+  // direct labels at line ends, nudged apart if they collide
+  const lastS = samples[samples.length - 1];
+  let ly = { cpu: y(lastS.cpu), ram: y(lastS.ram) };
+  if (Math.abs(ly.cpu - ly.ram) < 12) { const mid = (ly.cpu + ly.ram) / 2; const up = lastS.cpu >= lastS.ram; ly.cpu = mid + (up ? -6 : 6); ly.ram = mid + (up ? 6 : -6); }
+  for (const [k, , name] of series) {
+    const t = svg("text", { x: W - right + 6, y: ly[k] + 4 }); t.style.fill = "var(--ink-2)"; t.textContent = name; s.append(t);
+  }
+  // crosshair
+  const cross = svg("line", { y1: top, y2: H - bottom, stroke: "var(--muted)", "stroke-width": 1, visibility: "hidden" });
+  const dots = series.map(([, c]) => svg("circle", { r: 4, fill: c, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }));
+  s.append(cross, ...dots);
+  const hit = svg("rect", { x: left, y: top, width: W - left - right, height: H - top - bottom, fill: "transparent" });
+  hit.addEventListener("pointermove", (e) => {
+    const b = s.getBoundingClientRect();
+    const px = (e.clientX - b.left) * (W / b.width);
+    const t = Math.max(0, Math.min(end - 1, Math.floor(((px - left) / (W - left - right)) * end)));
+    const p = samples.find(q => q.t === t); if (!p) return;
+    const cx = x(t + 0.5);
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    series.forEach(([k], i) => { dots[i].setAttribute("cx", cx); dots[i].setAttribute("cy", y(p[k])); dots[i].setAttribute("visibility", "visible"); });
+    showTip(e, [
+      { label: `tick ${t}` },
+      { color: "var(--series-1)", value: pct(p.cpu), label: `CPU (${p.uc}/${totalCpu})` },
+      { color: "var(--series-2)", value: pct(p.ram), label: `RAM (${p.ur}/${totalRam} MB)` },
+    ]);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); hideTip(); });
+  s.append(hit);
+  host.append(s);
+}
+
+function renderTasks() {
+  const host = $("tasks");
+  const tbl = el("table");
+  const head = el("tr");
+  for (const [h, n] of [["ID"], ["Status"], ["VM"], ["CPU", 1], ["RAM", 1], ["Prio", 1], ["Arrive", 1], ["Start", 1], ["End", 1], ["Wait", 1], ["TAT", 1]]) head.append(el("th", n ? { class: "n" } : {}, h));
+  const thead = el("thead"); thead.append(head); tbl.append(thead);
+  const tb = el("tbody");
+  for (const t of last.tasks) {
+    const tr = el("tr", { class: "click" + (selectedTask === t.id ? " sel" : ""), tabindex: 0 });
+    const end = t.completion >= 0 ? t.completion : (t.rejection >= 0 ? t.rejection : "–");
+    const icon = { COMPLETED: "✓ ", REJECTED: "✕ " }[t.status] || "";
+    const cells = [
+      ["T" + t.id], [icon + t.status, 0, "st " + t.status], [t.vmId >= 0 ? "VM" + t.vmId : "–"],
+      [t.cpu, 1], [t.ram, 1], [t.priority, 1], [t.arrival, 1], [t.start >= 0 ? t.start : "–", 1], [end, 1],
+      [t.start >= 0 ? t.start - t.arrival : "–", 1], [t.completion >= 0 ? t.completion - t.arrival : "–", 1],
+    ];
+    for (const [v, n, cls] of cells) tr.append(el("td", { class: (n ? "n " : "") + (cls || "") }, String(v)));
+    tr.addEventListener("click", () => selectTask(t.id));
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter") selectTask(t.id); });
+    tb.append(tr);
+  }
+  tbl.append(tb);
+  host.replaceChildren(tbl);
+}
+
+function selectTask(id) {
+  selectedTask = id;
+  renderTasks();
+  renderGantt();
+  renderAutopsy();
+  $("evTask").value = id;
+  renderEvents();
+}
+
+function renderAutopsy() {
+  const host = $("autopsy");
+  if (selectedTask === null) {
+    $("autopsyTitle").textContent = "Decision autopsy";
+    host.replaceChildren(el("div", { class: "empty" }, "Select a task in the table or timeline."));
+    return;
+  }
+  $("autopsyTitle").textContent = `Decision autopsy: T${selectedTask}`;
+  host.replaceChildren();
+  host.append(el("div", { class: "note" }, last.config.label));
+  for (const e of last.events.filter(e => e.taskId === selectedTask)) {
+    const item = el("div", { class: "item" });
+    const h = el("div", { class: "h" });
+    h.append(el("span", { class: "tag " + e.type }, e.type), document.createTextNode(`  at tick ${e.tick}` + (e.vmId >= 0 ? ` · VM${e.vmId}` : "")));
+    item.append(h, el("div", {}, e.reason));
+    host.append(item);
+  }
+}
+
+function renderEvents() {
+  const host = $("events");
+  const type = $("evType").value, tid = $("evTask").value;
+  if (!last) return;
+  const list = last.events.filter(e => (!type || e.type === type) && (tid === "" || e.taskId === Number(tid)));
+  $("evCount").textContent = `${list.length} of ${last.events.length} events`;
+  host.replaceChildren();
+  const shown = list.slice(0, 1500);
+  for (const e of shown) {
+    const r = el("div", { class: "row" });
+    r.append(el("span", {}, "t=" + e.tick), el("span", {}, "T" + e.taskId), el("span", { class: "tag " + e.type }, e.type),
+      el("span", {}, e.vmId >= 0 ? "VM" + e.vmId : "–"), el("span", {}, e.reason));
+    host.append(r);
+  }
+  if (list.length > shown.length) host.append(el("div", { class: "note" }, `…${list.length - shown.length} more; filter by task to narrow.`));
+}
+
+function renderCompare(results) {
+  const host = $("cmp");
+  const cols = [
+    ["Completed", r => r.metrics.completed, "max", 0], ["Rejected", r => r.metrics.rejected, null, 0],
+    ["Avg wait", r => r.metrics.avgWaiting, "min", 2], ["Max wait", r => r.metrics.maxWaiting, "min", 0],
+    ["Avg TAT", r => r.metrics.avgTurnaround, "min", 2], ["Throughput", r => r.metrics.throughput, "max", 3],
+    ["CPU %", r => r.metrics.cpuUtilization * 100, "max", 1], ["RAM %", r => r.metrics.ramUtilization * 100, "max", 1],
+    ["End tick", r => r.metrics.endTick, "min", 0], ["Starved", r => r.metrics.starved.length, "min", 0],
+  ];
+  const best = cols.map(([, f, dir]) => dir ? (dir === "min" ? Math.min(...results.map(f)) : Math.max(...results.map(f))) : null);
+  const tbl = el("table");
+  const head = el("tr");
+  head.append(el("th", {}, "Scheduling"), el("th", {}, "Placement"));
+  for (const [h] of cols) head.append(el("th", { class: "n" }, h));
+  const thead = el("thead"); thead.append(head); tbl.append(thead);
+  const tb = el("tbody");
+  const SV = { "FCFS": "fcfs", "Priority": "priority", "Aging Priority": "aging" };
+  const PV = { "First-Fit": "first", "Best-Fit": "best", "Load-Aware": "load" };
+  for (const r of results) {
+    const current = last && r.config.scheduling === last.config.scheduling && r.config.placement === last.config.placement && r.config.queueMode === last.config.queueMode;
+    const tr = el("tr", { class: "click" + (current ? " sel" : ""), tabindex: 0, title: "Run this combination" });
+    tr.append(el("td", {}, r.config.scheduling), el("td", {}, r.config.placement));
+    cols.forEach(([, f, dir, d], i) => {
+      const v = f(r);
+      const isBest = dir && Math.abs(v - best[i]) < 1e-9 && new Set(results.map(f)).size > 1;
+      tr.append(el("td", { class: "n" + (isBest ? " best" : "") }, Number(v).toFixed(d)));
+    });
+    const go = () => { $("sched").value = SV[r.config.scheduling]; $("place").value = PV[r.config.placement]; run(); };
+    tr.addEventListener("click", go);
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+    tb.append(tr);
+  }
+  tbl.append(tb);
+  host.replaceChildren(tbl);
+  const c = results[0].config;
+  $("cmpSub").textContent = `Same workload replayed from a clean state under all 9 combinations (queue ${c.queueMode}, aging K=${c.agingInterval}, starvation > ${c.starvationThreshold}). ★ marks the best value in a column. Click a row to run it.`;
+}
+
+// ------------------------------------------------------------ wiring
+$("run").addEventListener("click", run);
+$("compare").addEventListener("click", compare);
+$("workload").addEventListener("change", async () => {
+  try { setError(""); await loadWorkload($("workload").value); await run(); } catch (e) { setError(e.message); }
+});
+$("evType").addEventListener("change", renderEvents);
+$("evTask").addEventListener("input", renderEvents);
+let resizeTimer;
+addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (last) { renderGantt(); renderUtil(); } }, 150); });
+
+(async () => {
+  try {
+    const names = await api("/api/workloads");
+    for (const n of names) $("workload").append(el("option", { value: n }, n));
+    await loadWorkload(names[0]);
+    await run();
+  } catch (e) { setError("Could not reach the simulator server: " + e.message); }
+})();
+</script>
+</body>
+</html>
